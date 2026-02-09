@@ -1,0 +1,222 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  color: #ffffff;
+  background: linear-gradient(180deg, #0f8795 0%, #0b6f7a 100%);
+}
+
+/* LINKS */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* NAVBAR */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 80px;
+}
+
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+  font-size: 14px;
+}
+
+.nav-links a {
+  opacity: 0.85;
+}
+
+.nav-links a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* PAGE HEADER */
+.page-header {
+  text-align: center;
+  margin: 90px auto 30px;
+}
+
+.page-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 50px;
+  margin-bottom: 10px;
+}
+
+.page-header p {
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+/* MAIN CONTAINER */
+.container {
+  max-width: 1100px;
+  margin: 0 auto 100px;
+  padding: 20px;
+}
+
+/* GRID LAYOUT */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+/* CARD */
+.card {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  border-radius: 14px;
+  padding: 28px;
+  transition: transform 0.3s ease, background 0.3s ease;
+  cursor: pointer;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.card h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.card p {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+/* TABLE (ISSUE TRACKER) */
+.table-wrap {
+  background: rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 16px;
+  text-align: left;
+}
+
+th {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+tr:not(:last-child) td {
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+/* HERO SECTION */
+.hero {
+  min-height: calc(100vh - 90px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.hero-content h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 64px;
+  line-height: 1.15;
+  margin-bottom: 40px;
+}
+
+/* HERO ACTIONS */
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 28px;
+}
+
+/* PRIMARY BUTTON */
+.btn-primary {
+  padding: 14px 36px;
+  border: 1px solid rgba(255,255,255,0.8);
+  font-size: 12px;
+  letter-spacing: 2px;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #ffffff;
+  color: #0b6f7a;
+}
+
+/* SECONDARY BUTTON */
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  opacity: 0.9;
+}
+
+.btn-secondary:hover {
+  opacity: 1;
+}
+
+/* PLAY ICON */
+.play-icon {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+/* PROJECT STATUS BADGES */
+.status {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.status.good {
+  background-color: rgba(76, 175, 80, 0.35);
+  color: #eaffef;
+}
+
+.status.risk {
+  background-color: rgba(255, 193, 7, 0.35);
+  color: #fff6d8;
+}
+
+.status.delay {
+  background-color: rgba(244, 67, 54, 0.35);
+  color: #ffe3e3;
+}
+
+/* OWNER TEXT */
+.owner {
+  font-size: 13px;
+  opacity: 0.85;
+}
