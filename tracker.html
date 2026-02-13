@@ -1,14 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>PMG | Issue Tracker</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&family=Inter&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PMG Hub | Issue Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="navbar">
-  <div class="logo">PMG</div>
+  <div class="logo">
+    <img src="logo.PNG" alt="APEC Homes" class="logo-img">
+  </div>
   <nav class="nav-links">
     <a href="index.html">Home</a>
     <a href="glinks.html">G.Links</a>
@@ -20,42 +23,149 @@
 
 <section class="page-header">
   <h1>Issue Tracker</h1>
-  <p>Monitor, manage, and resolve reported project issues</p>
 </section>
 
-<section class="container">
-  <div class="table-wrap">
-    <table>
-      <tr>
-        <th>Issue</th>
-        <th>Project</th>
-        <th>Status</th>
-        <th>Owner</th>
-      </tr>
+<main class="container downloadables-wrap">
+  <section class="panel">
+    <form id="issueForm" class="input-grid">
+      <label>Project Name
+        <input id="projectName" type="text" required>
+      </label>
+      <label>Issue Details
+        <input id="issueDetails" type="text" required>
+      </label>
+      <label>Date
+        <input id="issueDate" type="date" required>
+      </label>
+      <label>Status
+        <select id="issueStatus" required>
+          <option>Open</option>
+          <option>In Progress</option>
+          <option>Delayed</option>
+          <option>Resolved</option>
+        </select>
+      </label>
+      <div class="action-row">
+        <button type="submit" class="subtle-btn">Add</button>
+        <button type="button" id="resetIssueForm" class="subtle-btn">Reset</button>
+      </div>
+    </form>
+  </section>
 
-      <tr>
-        <td>Delayed approval</td>
-        <td>System Upgrade</td>
-        <td><span class="status open">Open</span></td>
-        <td>PMO</td>
-      </tr>
+  <section class="panel">
+    <div class="status-summary" id="statusSummary"></div>
+    <ul class="files-list" id="issueList"></ul>
+  </section>
+</main>
 
-      <tr>
-        <td>Missing document</td>
-        <td>Onboarding</td>
-        <td><span class="status progress">In Progress</span></td>
-        <td>Admin</td>
-      </tr>
+<script>
+  const issueForm = document.getElementById('issueForm');
+  const resetIssueForm = document.getElementById('resetIssueForm');
+  const issueListEl = document.getElementById('issueList');
+  const statusSummaryEl = document.getElementById('statusSummary');
+  const STORAGE_KEY = 'pmg-issues-v1';
 
-      <tr>
-        <td>Incorrect data entry</td>
-        <td>Migration</td>
-        <td><span class="status closed">Resolved</span></td>
-        <td>IT Team</td>
-      </tr>
-    </table>
-  </div>
-</section>
+  function loadIssues() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  }
 
+  function saveIssues(issues) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(issues));
+  }
+
+  function addIssue(event) {
+    event.preventDefault();
+    const issues = loadIssues();
+    issues.unshift({
+      id: crypto.randomUUID(),
+      project: document.getElementById('projectName').value.trim(),
+      details: document.getElementById('issueDetails').value.trim(),
+      date: document.getElementById('issueDate').value,
+      status: document.getElementById('issueStatus').value,
+      deleted: false
+    });
+    saveIssues(issues);
+    issueForm.reset();
+    render();
+  }
+
+  function setDeleted(id, deleted) {
+    const issues = loadIssues().map(issue => issue.id === id ? { ...issue, deleted } : issue);
+    saveIssues(issues);
+    render();
+  }
+
+  function renderStatusSummary(issues) {
+    const activeIssues = issues.filter(issue => !issue.deleted);
+    const counts = {
+      Open: 0,
+      'In Progress': 0,
+      Delayed: 0,
+      Resolved: 0
+    };
+
+    activeIssues.forEach(issue => {
+      if (counts[issue.status] !== undefined) counts[issue.status] += 1;
+    });
+
+    statusSummaryEl.innerHTML = Object.entries(counts)
+      .map(([label, count]) => `
+        <div class="status-box">
+          <span>${label}</span>
+          <strong>${count}</strong>
+        </div>
+      `)
+      .join('');
+  }
+
+  function issueItem(issue) {
+    const li = document.createElement('li');
+    li.className = `file-row ${issue.deleted ? 'is-deleted' : ''}`;
+
+    const info = document.createElement('div');
+    info.className = 'file-info';
+    info.innerHTML = `
+      <strong>${issue.project}</strong>
+      <span>${issue.details}</span>
+      <span>${issue.date} • ${issue.status}</span>
+    `;
+
+    const controls = document.createElement('div');
+    controls.className = 'file-controls';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'subtle-btn danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.disabled = issue.deleted;
+    deleteBtn.addEventListener('click', () => setDeleted(issue.id, true));
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.className = 'subtle-btn';
+    restoreBtn.textContent = 'Restore';
+    restoreBtn.disabled = !issue.deleted;
+    restoreBtn.addEventListener('click', () => setDeleted(issue.id, false));
+
+    controls.append(deleteBtn, restoreBtn);
+    li.append(info, controls);
+    return li;
+  }
+
+  function render() {
+    const issues = loadIssues();
+    renderStatusSummary(issues);
+
+    issueListEl.innerHTML = '';
+    if (issues.length === 0) {
+      issueListEl.innerHTML = '<li class="file-row empty">No issues yet.</li>';
+      return;
+    }
+
+    issues.forEach(issue => issueListEl.appendChild(issueItem(issue)));
+  }
+
+  issueForm.addEventListener('submit', addIssue);
+  resetIssueForm.addEventListener('click', () => issueForm.reset());
+  render();
+</script>
 </body>
 </html>
