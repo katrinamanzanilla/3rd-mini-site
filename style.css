@@ -220,3 +220,68 @@ tr:not(:last-child) td {
   font-size: 13px;
   opacity: 0.85;
 }
+.logo-img {
+  width: 138px;
+  max-width: 100%;
+  height: auto;
+}
+
+.links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 22px;
+}
+
+.link-card {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 24px;
+  backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.link-card:hover {
+  transform: translateY(-6px);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.link-tag {
+  width: fit-content;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.link-card h3 {
+  font-size: 20px;
+}
+
+.link-card p {
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.9;
+  min-height: 42px;
+}
+
+.link-btn {
+  margin-top: auto;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: all 0.2s ease;
+}
+
+.link-btn:hover {
+  background: #ffffff;
+  color: #0b6f7a;
+}
