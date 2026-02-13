@@ -1,22 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PMG | Downloadables</title>
-
-  <!-- Google Fonts -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PMG Hub | Downloadables</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-  <!-- NAVBAR -->
   <header class="navbar">
-  <div class="logo">
-    <img src="logo.PNG" alt="APEC Homes" class="logo-img">
-  </div>
+    <div class="logo">
+      <img src="logo.PNG" alt="APEC Homes" class="logo-img">
+    </div>
+
     <nav class="nav-links">
       <a href="index.html">Home</a>
       <a href="glinks.html">G.Links</a>
@@ -26,38 +22,240 @@
     </nav>
   </header>
 
-  <!-- PAGE HEADER -->
   <section class="page-header">
     <h1>Downloadable Manuals & Forms</h1>
-    <p>Official PMG manuals, templates, and standard forms</p>
+    <p>Add and manage IT PM manuals and forms with one-click download actions.</p>
   </section>
 
-  <!-- CONTENT -->
-  <section class="container">
-    <div class="grid">
+  <main class="container downloadables-wrap">
+    <section class="panel">
+      <h2>Add File</h2>
+      <form id="downloadableForm" class="input-grid">
+        <label>
+          Google Link
+          <input id="fileLink" type="url" placeholder="https://docs.google.com/..." required>
+        </label>
 
-      <a href="files/PMG_Operations_Manual.pdf" download class="card">
-        <h3>PMG Operations Manual</h3>
-        <p>Guidelines and standard procedures</p>
-      </a>
+        <label>
+          File Type
+          <select id="fileType" required>
+            <option value="Manual">Manual</option>
+            <option value="Form">Form</option>
+          </select>
+        </label>
 
-      <a href="files/Incident_Report_Form.docx" download class="card">
-        <h3>Incident Report Form</h3>
-        <p>For documenting issues and incidents</p>
-      </a>
+        <label>
+          File Name
+          <input id="fileName" type="text" placeholder="e.g., UAT Process Manual" required>
+        </label>
 
-      <a href="files/Project_Request_Form.docx" download class="card">
-        <h3>Project Request Form</h3>
-        <p>Initiate new project requests</p>
-      </a>
+        <div class="action-row">
+          <button type="submit" class="btn-primary subtle-btn">Add</button>
+          <button type="button" id="resetBtn" class="btn-secondary subtle-btn">Reset</button>
+        </div>
+      </form>
+    </section>
 
-      <a href="files/Change_Management_Template.xlsx" download class="card">
-        <h3>Change Management Template</h3>
-        <p>For scope and change approvals</p>
-      </a>
+    <section class="panel">
+      <div class="toggle-row">
+        <button id="openManuals" class="subtle-btn active-view">Open Downloadable Manuals</button>
+        <button id="openForms" class="subtle-btn">Open Downloadable Forms</button>
+      </div>
 
-    </div>
-  </section>
+      <label class="search-wrap">
+        Search by file name
+        <input id="searchInput" type="text" placeholder="Search manuals/forms...">
+      </label>
 
+      <ul id="filesList" class="files-list"></ul>
+    </section>
+  </main>
+
+  <script>
+    const formEl = document.getElementById('downloadableForm');
+    const linkEl = document.getElementById('fileLink');
+    const typeEl = document.getElementById('fileType');
+    const nameEl = document.getElementById('fileName');
+    const resetBtn = document.getElementById('resetBtn');
+    const filesListEl = document.getElementById('filesList');
+    const searchInputEl = document.getElementById('searchInput');
+    const openManualsBtn = document.getElementById('openManuals');
+    const openFormsBtn = document.getElementById('openForms');
+
+    const STORAGE_KEY = 'pmg-downloadables-v1';
+    let activeType = 'Manual';
+
+    function loadFiles() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveFiles(files) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+    }
+
+    function normalizeGoogleDownloadLink(rawLink) {
+      const url = new URL(rawLink);
+      const host = url.hostname.replace('www.', '');
+      const pathname = url.pathname;
+
+      if (!host.includes('google.com') && !host.includes('googleusercontent.com')) {
+        return rawLink;
+      }
+
+      if (host === 'drive.google.com') {
+        const match = pathname.match(/\/file\/d\/([^/]+)/);
+        const idFromPath = match ? match[1] : '';
+        const idFromQuery = url.searchParams.get('id');
+        const fileId = idFromPath || idFromQuery;
+        if (fileId) return `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+
+      if (host === 'docs.google.com') {
+        const segments = pathname.split('/').filter(Boolean);
+        const docType = segments[0];
+        const docId = segments[2];
+        if (!docId) return rawLink;
+
+        if (docType === 'document') return `https://docs.google.com/document/d/${docId}/export?format=pdf`;
+        if (docType === 'spreadsheets') return `https://docs.google.com/spreadsheets/d/${docId}/export?format=xlsx`;
+        if (docType === 'presentation') return `https://docs.google.com/presentation/d/${docId}/export/pdf`;
+        if (docType === 'forms') return `https://docs.google.com/forms/d/${docId}/viewform`;
+      }
+
+      return rawLink;
+    }
+
+    function toDownloadFilename(entry) {
+      const safeName = entry.name.replace(/[^a-z0-9-_. ]/gi, '').trim() || 'download-file';
+      return `${safeName}.pdf`;
+    }
+
+    function addEntry(event) {
+      event.preventDefault();
+
+      const rawLink = linkEl.value.trim();
+      const type = typeEl.value;
+      const name = nameEl.value.trim();
+
+      if (!rawLink || !type || !name) return;
+
+      let convertedLink = rawLink;
+      try {
+        convertedLink = normalizeGoogleDownloadLink(rawLink);
+      } catch (error) {
+        convertedLink = rawLink;
+      }
+
+      const files = loadFiles();
+      files.unshift({
+        id: crypto.randomUUID(),
+        name,
+        type,
+        rawLink,
+        downloadLink: convertedLink,
+        deleted: false,
+        createdAt: Date.now()
+      });
+
+      saveFiles(files);
+      formEl.reset();
+      typeEl.value = type;
+      renderFiles();
+    }
+
+    function resetInputs() {
+      formEl.reset();
+      typeEl.value = 'Manual';
+    }
+
+    function switchView(type) {
+      activeType = type;
+      openManualsBtn.classList.toggle('active-view', type === 'Manual');
+      openFormsBtn.classList.toggle('active-view', type === 'Form');
+      renderFiles();
+    }
+
+    function updateEntryState(id, deleted) {
+      const files = loadFiles().map(file => file.id === id ? { ...file, deleted } : file);
+      saveFiles(files);
+      renderFiles();
+    }
+
+    function triggerDownload(entry) {
+      const anchor = document.createElement('a');
+      anchor.href = entry.downloadLink;
+      anchor.download = toDownloadFilename(entry);
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    }
+
+    function fileListItem(entry) {
+      const li = document.createElement('li');
+      li.className = `file-row ${entry.deleted ? 'is-deleted' : ''}`;
+
+      const info = document.createElement('div');
+      info.className = 'file-info';
+      info.innerHTML = `
+        <strong>${entry.name}</strong>
+        <span>${entry.type} • <a href="${entry.rawLink}" target="_blank" rel="noopener noreferrer">source link</a></span>
+      `;
+
+      const controls = document.createElement('div');
+      controls.className = 'file-controls';
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.textContent = 'Download';
+      downloadBtn.className = 'subtle-btn';
+      downloadBtn.disabled = entry.deleted;
+      downloadBtn.addEventListener('click', () => triggerDownload(entry));
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.className = 'subtle-btn danger';
+      deleteBtn.disabled = entry.deleted;
+      deleteBtn.addEventListener('click', () => updateEntryState(entry.id, true));
+
+      const restoreBtn = document.createElement('button');
+      restoreBtn.textContent = 'Restore';
+      restoreBtn.className = 'subtle-btn';
+      restoreBtn.disabled = !entry.deleted;
+      restoreBtn.addEventListener('click', () => updateEntryState(entry.id, false));
+
+      controls.append(downloadBtn, deleteBtn, restoreBtn);
+      li.append(info, controls);
+      return li;
+    }
+
+    function renderFiles() {
+      const query = searchInputEl.value.trim().toLowerCase();
+      const files = loadFiles()
+        .filter(file => file.type === activeType)
+        .filter(file => file.name.toLowerCase().includes(query));
+
+      filesListEl.innerHTML = '';
+
+      if (files.length === 0) {
+        filesListEl.innerHTML = `<li class="file-row empty">No ${activeType.toLowerCase()} files found.</li>`;
+        return;
+      }
+
+      files.forEach(file => filesListEl.appendChild(fileListItem(file)));
+    }
+
+    formEl.addEventListener('submit', addEntry);
+    resetBtn.addEventListener('click', resetInputs);
+    searchInputEl.addEventListener('input', renderFiles);
+    openManualsBtn.addEventListener('click', () => switchView('Manual'));
+    openFormsBtn.addEventListener('click', () => switchView('Form'));
+
+    switchView('Manual');
+  </script>
 </body>
 </html>
