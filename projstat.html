@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PMG | Project Status Overview</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="navbar">
   <div class="logo">PMG</div>
   <nav class="nav-links">
@@ -23,41 +22,548 @@
 
 <section class="page-header">
   <h1>Project Status Overview</h1>
-  <p>Current health and progress of active PMG initiatives</p>
+  <p>Paste a Google Sheets link to review project health in one place.</p>
 </section>
 
-<section class="container">
-  <div class="grid">
+<main class="container status-page">
+  <section class="panel">
+    <form id="sheet-source-form" class="input-grid" novalidate>
+      <label for="sheet-source-input">Google Sheets source
+        <input
+          id="sheet-source-input"
+          type="text"
+          placeholder="Paste a Google Sheets link or sheet ID"
+          autocomplete="off"
+          required
+        >
+      </label>
+      <div class="action-row">
+        <button type="submit" id="use-file-button" class="subtle-btn">View Data</button>
+        <button type="button" id="sheet-source-reset" class="subtle-btn danger">Reset</button>
+      </div>
+      <p id="sheet-source-feedback" class="source-feedback" aria-live="polite"></p>
+    </form>
+  </section>
 
-    <div class="card">
-      <h3>Project Alpha</h3>
-      <p>
-        Status:
-        <span class="status good">On Track</span>
-      </p>
-      <p class="owner">Owner: PMO</p>
+  <section class="status-summary" aria-label="Project summary cards">
+    <article class="status-box">
+      <span>Total Projects</span>
+      <strong id="kpi-total-projects">0</strong>
+    </article>
+    <article class="status-box">
+      <span>Total Milestones</span>
+      <strong id="kpi-total-milestones">0</strong>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="status-filters">
+      <label for="system-filter">System
+        <select id="system-filter">
+          <option value="">All Systems</option>
+        </select>
+      </label>
+      <label for="milestone-filter">Milestone
+        <select id="milestone-filter">
+          <option value="">All Milestones</option>
+        </select>
+      </label>
+      <label for="sheet-search">Search
+        <input id="sheet-search" type="search" placeholder="Search system, milestone, developer, manager">
+      </label>
     </div>
 
-    <div class="card">
-      <h3>Project Beta</h3>
-      <p>
-        Status:
-        <span class="status risk">At Risk</span>
-      </p>
-      <p class="owner">Owner: Operations</p>
+    <div class="table-wrap sheet-table-wrap" role="region" aria-label="Project status table" tabindex="0">
+      <table>
+        <thead id="status-table-head"></thead>
+        <tbody id="status-table-body">
+          <tr>
+            <td class="empty-row" colspan="1">Load a sheet to view project status data.</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
+  </section>
+</main>
 
-    <div class="card">
-      <h3>Project Gamma</h3>
-      <p>
-        Status:
-        <span class="status delay">Delayed</span>
-      </p>
-      <p class="owner">Owner: IT Team</p>
-    </div>
+<script>
+  const SOURCE_STORAGE_KEY = 'pmg-project-status-source';
+  const DEFAULT_FEEDBACK = 'Paste a Google Sheets link and select View Data.';
 
-  </div>
-</section>
+  const state = {
+    headers: [],
+    rows: [],
+    visibleRows: [],
+    columns: {
+      system: -1,
+      milestone: -1,
+      developer: -1,
+      manager: -1
+    }
+  };
 
+  const formEl = document.getElementById('sheet-source-form');
+  const sourceInputEl = document.getElementById('sheet-source-input');
+  const sourceResetEl = document.getElementById('sheet-source-reset');
+  const sourceFeedbackEl = document.getElementById('sheet-source-feedback');
+  const tableHeadEl = document.getElementById('status-table-head');
+  const tableBodyEl = document.getElementById('status-table-body');
+  const kpiTotalProjectsEl = document.getElementById('kpi-total-projects');
+  const kpiTotalMilestonesEl = document.getElementById('kpi-total-milestones');
+  const systemFilterEl = document.getElementById('system-filter');
+  const milestoneFilterEl = document.getElementById('milestone-filter');
+  const searchInputEl = document.getElementById('sheet-search');
+
+  const aliases = {
+    system: ['system', 'project name', 'system project name'],
+    milestone: ['milestone', 'next milestone'],
+    developer: ['assigned developer', 'developer'],
+    manager: ['assigned project manager', 'project manager']
+  };
+
+  function normalizeHeader(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function extractSheetMeta(input) {
+    const rawInput = String(input || '').trim();
+    if (!rawInput) {
+      throw new Error('Please enter a Google Sheets URL or a sheet ID.');
+    }
+
+    let sheetId = '';
+    let gid = '';
+    let sheet = '';
+
+    if (/^[a-zA-Z0-9-_]{25,}$/.test(rawInput)) {
+      return { sheetId: rawInput, gid: '', sheet: '' };
+    }
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(rawInput);
+    } catch {
+      parsedUrl = new URL(`https://${rawInput}`);
+    }
+
+    const path = parsedUrl.pathname;
+    const directMatch = path.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    const driveMatch = path.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+
+    sheetId = (directMatch && directMatch[1])
+      || (driveMatch && driveMatch[1])
+      || parsedUrl.searchParams.get('id')
+      || parsedUrl.searchParams.get('key')
+      || '';
+
+    if (!sheetId || !/^[a-zA-Z0-9-_]{25,}$/.test(sheetId)) {
+      throw new Error('Could not find a valid Google Sheets ID in that input.');
+    }
+
+    gid = parsedUrl.searchParams.get('gid') || '';
+    sheet = parsedUrl.searchParams.get('sheet') || '';
+
+    const hash = parsedUrl.hash ? parsedUrl.hash.replace(/^#/, '') : '';
+    const hashParams = new URLSearchParams(hash);
+
+    if (!gid) gid = hashParams.get('gid') || '';
+    if (!sheet) sheet = hashParams.get('sheet') || '';
+
+    return { sheetId, gid, sheet };
+  }
+
+  function buildSheetUrl(basePath, meta, extra = '') {
+    const params = new URLSearchParams();
+    if (meta.gid) params.set('gid', meta.gid);
+    if (meta.sheet) params.set('sheet', meta.sheet);
+
+    const suffix = params.toString();
+    return `https://docs.google.com/spreadsheets/d/${meta.sheetId}${basePath}?${suffix}${suffix && extra ? '&' : ''}${extra}`;
+  }
+
+  function parseGvizPayload(rawText) {
+    const start = rawText.indexOf('{');
+    const end = rawText.lastIndexOf('}');
+    if (start === -1 || end === -1) {
+      throw new Error('GViz response was not valid JSON text.');
+    }
+
+    const payload = JSON.parse(rawText.slice(start, end + 1));
+    if (!payload.table || !Array.isArray(payload.table.cols) || !Array.isArray(payload.table.rows)) {
+      throw new Error('GViz payload is missing table data.');
+    }
+
+    const headers = payload.table.cols.map((col, index) => col.label || col.id || `Column ${index + 1}`);
+    const rows = payload.table.rows.map(row => {
+      const cells = row.c || [];
+      return headers.map((_, colIndex) => {
+        const cell = cells[colIndex];
+        if (!cell) return '';
+        if (cell.f !== null && cell.f !== undefined) return String(cell.f);
+        if (cell.v === null || cell.v === undefined) return '';
+        return String(cell.v);
+      });
+    });
+
+    return { headers, rows };
+  }
+
+  function gvizJsonpFetch(meta) {
+    const callbackName = `pmgGvizJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const endpoint = buildSheetUrl('/gviz/tq', meta, `tqx=responseHandler:${callbackName}`);
+
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      let settled = false;
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error('GViz JSONP request timed out.'));
+      }, 8000);
+
+      function cleanup() {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        delete window[callbackName];
+        script.remove();
+      }
+
+      window[callbackName] = payload => {
+        try {
+          if (!payload || !payload.table) {
+            throw new Error('GViz JSONP payload did not include table data.');
+          }
+
+          const headers = payload.table.cols.map((col, index) => col.label || col.id || `Column ${index + 1}`);
+          const rows = payload.table.rows.map(row => {
+            const cells = row.c || [];
+            return headers.map((_, colIndex) => {
+              const cell = cells[colIndex];
+              if (!cell) return '';
+              if (cell.f !== null && cell.f !== undefined) return String(cell.f);
+              if (cell.v === null || cell.v === undefined) return '';
+              return String(cell.v);
+            });
+          });
+
+          cleanup();
+          resolve({ headers, rows });
+        } catch (error) {
+          cleanup();
+          reject(error);
+        }
+      };
+
+      script.src = endpoint;
+      script.onerror = () => {
+        cleanup();
+        reject(new Error('GViz JSONP script could not be loaded.'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  function parseCsv(csvText) {
+    const rows = [];
+    let current = '';
+    let row = [];
+    let inQuotes = false;
+
+    for (let i = 0; i < csvText.length; i += 1) {
+      const char = csvText[i];
+      const next = csvText[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && next === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (char === ',' && !inQuotes) {
+        row.push(current);
+        current = '';
+        continue;
+      }
+
+      if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && next === '\n') i += 1;
+        row.push(current);
+        rows.push(row);
+        row = [];
+        current = '';
+        continue;
+      }
+
+      current += char;
+    }
+
+    if (current.length > 0 || row.length > 0) {
+      row.push(current);
+      rows.push(row);
+    }
+
+    const sanitized = rows.filter(r => r.some(cell => String(cell || '').trim() !== ''));
+    if (!sanitized.length) throw new Error('CSV export returned no rows.');
+
+    const headers = sanitized[0].map((header, index) => String(header || '').trim() || `Column ${index + 1}`);
+    const dataRows = sanitized.slice(1).map(r => headers.map((_, idx) => String(r[idx] ?? '')));
+    return { headers, rows: dataRows };
+  }
+
+  async function loadData(meta) {
+    const attempts = [];
+
+    try {
+      const gvizUrl = buildSheetUrl('/gviz/tq', meta, 'tqx=out:json');
+      const response = await fetch(gvizUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const text = await response.text();
+      const data = parseGvizPayload(text);
+      return { ...data, strategy: 'GViz JSON' };
+    } catch (error) {
+      attempts.push(`GViz JSON (${error.message})`);
+    }
+
+    try {
+      const data = await gvizJsonpFetch(meta);
+      return { ...data, strategy: 'GViz JSONP' };
+    } catch (error) {
+      attempts.push(`GViz JSONP (${error.message})`);
+    }
+
+    try {
+      const csvUrl = buildSheetUrl('/export', meta, 'format=csv');
+      const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const text = await response.text();
+      const data = parseCsv(text);
+      return { ...data, strategy: 'CSV Export' };
+    } catch (error) {
+      attempts.push(`CSV Export (${error.message})`);
+    }
+
+    try {
+      const sheetName = meta.sheet || 'Sheet1';
+      const openSheetUrl = `https://opensheet.elk.sh/${meta.sheetId}/${encodeURIComponent(sheetName)}`;
+      const response = await fetch(openSheetUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      if (!Array.isArray(json) || !json.length) throw new Error('OpenSheet returned no rows.');
+
+      const headers = Object.keys(json[0]);
+      const rows = json.map(entry => headers.map(header => String(entry[header] ?? '')));
+      return { headers, rows, strategy: 'OpenSheet API' };
+    } catch (error) {
+      attempts.push(`OpenSheet API (${error.message})`);
+    }
+
+    throw new Error(`Unable to load this sheet. Confirm it is shared for link access and try again. Attempts: ${attempts.join(' -> ')}`);
+  }
+
+  function findColumn(headers, type) {
+    const normalizedHeaders = headers.map(normalizeHeader);
+    const normalizedAliases = aliases[type].map(normalizeHeader);
+
+    return normalizedHeaders.findIndex(header => normalizedAliases.includes(header));
+  }
+
+  function setFeedback(message, isError = false) {
+    sourceFeedbackEl.textContent = message;
+    sourceFeedbackEl.classList.toggle('is-error', isError);
+  }
+
+  function renderTable(headers, rows) {
+    tableHeadEl.innerHTML = '';
+    tableBodyEl.innerHTML = '';
+
+    const headRow = document.createElement('tr');
+    headers.forEach(header => {
+      const th = document.createElement('th');
+      th.textContent = header;
+      headRow.appendChild(th);
+    });
+    tableHeadEl.appendChild(headRow);
+
+    if (!rows.length) {
+      const emptyRow = document.createElement('tr');
+      const emptyCell = document.createElement('td');
+      emptyCell.className = 'empty-row';
+      emptyCell.colSpan = Math.max(headers.length, 1);
+      emptyCell.textContent = 'No results found';
+      emptyRow.appendChild(emptyCell);
+      tableBodyEl.appendChild(emptyRow);
+      return;
+    }
+
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      row.forEach(cell => {
+        const td = document.createElement('td');
+        td.textContent = cell;
+        tr.appendChild(td);
+      });
+      tableBodyEl.appendChild(tr);
+    });
+  }
+
+  function updateKpis(rows) {
+    const fallbackIndex = state.columns.system !== -1 ? state.columns.system : 0;
+    const uniqueProjects = new Set(
+      rows
+        .map(row => String(row[fallbackIndex] ?? '').trim())
+        .filter(Boolean)
+    );
+
+    const totalProjects = uniqueProjects.size || (rows.length ? 1 : 0);
+    kpiTotalProjectsEl.textContent = String(totalProjects);
+    kpiTotalMilestonesEl.textContent = String(rows.length);
+  }
+
+  function fillSelectOptions(selectEl, values, defaultLabel) {
+    const previousValue = selectEl.value;
+    selectEl.innerHTML = `<option value="">${defaultLabel}</option>`;
+
+    values.forEach(value => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      selectEl.appendChild(option);
+    });
+
+    if (previousValue && values.includes(previousValue)) {
+      selectEl.value = previousValue;
+    }
+  }
+
+  function refreshFilters() {
+    const systemIndex = state.columns.system !== -1 ? state.columns.system : 0;
+    const milestoneIndex = state.columns.milestone;
+
+    const systemValues = [...new Set(state.rows.map(row => String(row[systemIndex] ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const milestoneValues = milestoneIndex === -1
+      ? []
+      : [...new Set(state.rows.map(row => String(row[milestoneIndex] ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+    fillSelectOptions(systemFilterEl, systemValues, 'All Systems');
+    fillSelectOptions(milestoneFilterEl, milestoneValues, 'All Milestones');
+    milestoneFilterEl.disabled = milestoneIndex === -1;
+  }
+
+  function applyFilters() {
+    if (!state.headers.length) {
+      updateKpis([]);
+      renderTable([], []);
+      return;
+    }
+
+    const selectedSystem = systemFilterEl.value.trim().toLowerCase();
+    const selectedMilestone = milestoneFilterEl.value.trim().toLowerCase();
+    const searchTerm = searchInputEl.value.trim().toLowerCase();
+
+    const systemIndex = state.columns.system !== -1 ? state.columns.system : 0;
+    const milestoneIndex = state.columns.milestone;
+    const searchIndices = [
+      systemIndex,
+      milestoneIndex,
+      state.columns.developer,
+      state.columns.manager
+    ].filter(index => index !== -1);
+
+    state.visibleRows = state.rows.filter(row => {
+      const systemValue = String(row[systemIndex] ?? '').toLowerCase();
+      const milestoneValue = milestoneIndex === -1 ? '' : String(row[milestoneIndex] ?? '').toLowerCase();
+
+      const matchesSystem = !selectedSystem || systemValue === selectedSystem;
+      const matchesMilestone = !selectedMilestone || milestoneValue === selectedMilestone;
+
+      const matchesSearch = !searchTerm || searchIndices.some(index => String(row[index] ?? '').toLowerCase().includes(searchTerm));
+
+      return matchesSystem && matchesMilestone && matchesSearch;
+    });
+
+    updateKpis(state.visibleRows);
+    renderTable(state.headers, state.visibleRows);
+  }
+
+  function clearDataState() {
+    state.headers = [];
+    state.rows = [];
+    state.visibleRows = [];
+    state.columns = {
+      system: -1,
+      milestone: -1,
+      developer: -1,
+      manager: -1
+    };
+
+    tableHeadEl.innerHTML = '';
+    tableBodyEl.innerHTML = '<tr><td class="empty-row" colspan="1">Load a sheet to view project status data.</td></tr>';
+
+    systemFilterEl.innerHTML = '<option value="">All Systems</option>';
+    milestoneFilterEl.innerHTML = '<option value="">All Milestones</option>';
+    milestoneFilterEl.disabled = false;
+    searchInputEl.value = '';
+
+    kpiTotalProjectsEl.textContent = '0';
+    kpiTotalMilestonesEl.textContent = '0';
+  }
+
+  async function handleLoadData(inputValue) {
+    try {
+      setFeedback('Loading data...');
+      const meta = extractSheetMeta(inputValue);
+      const data = await loadData(meta);
+
+      state.headers = data.headers;
+      state.rows = data.rows;
+      state.columns.system = findColumn(data.headers, 'system');
+      state.columns.milestone = findColumn(data.headers, 'milestone');
+      state.columns.developer = findColumn(data.headers, 'developer');
+      state.columns.manager = findColumn(data.headers, 'manager');
+
+      refreshFilters();
+      applyFilters();
+
+      localStorage.setItem(SOURCE_STORAGE_KEY, inputValue.trim());
+      setFeedback(`Loaded ${data.rows.length} rows using ${data.strategy}.`);
+    } catch (error) {
+      clearDataState();
+      setFeedback(error.message, true);
+    }
+  }
+
+  formEl.addEventListener('submit', event => {
+    event.preventDefault();
+    handleLoadData(sourceInputEl.value);
+  });
+
+  sourceResetEl.addEventListener('click', () => {
+    sourceInputEl.value = '';
+    localStorage.removeItem(SOURCE_STORAGE_KEY);
+    clearDataState();
+    setFeedback(DEFAULT_FEEDBACK);
+  });
+
+  systemFilterEl.addEventListener('change', applyFilters);
+  milestoneFilterEl.addEventListener('change', applyFilters);
+  searchInputEl.addEventListener('input', applyFilters);
+
+  window.addEventListener('DOMContentLoaded', () => {
+    setFeedback(DEFAULT_FEEDBACK);
+    const saved = localStorage.getItem(SOURCE_STORAGE_KEY);
+    if (saved) {
+      sourceInputEl.value = saved;
+      handleLoadData(saved);
+    }
+  });
+</script>
 </body>
 </html>
