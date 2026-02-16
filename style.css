@@ -6,9 +6,11 @@
 
 body {
   font-family: 'Inter', sans-serif;
+  font-size: 15px;
   min-height: 100vh;
   color: #ffffff;
   background: linear-gradient(180deg, #0f8795 0%, #0b6f7a 100%);
+  line-height: 1.5;
 }
 
 /* LINKS */
@@ -26,15 +28,20 @@ a {
 }
 
 .logo {
-  font-family: 'Playfair Display', serif;
-  font-size: 22px;
-  letter-spacing: 1px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .nav-links {
   display: flex;
-  gap: 32px;
-  font-size: 14px;
+  gap: 30px;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
 .nav-links a {
@@ -46,6 +53,16 @@ a {
   text-decoration: underline;
 }
 
+.nav-links a.active,
+.nav-links a:active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
 /* PAGE HEADER */
 .page-header {
   text-align: center;
@@ -54,12 +71,13 @@ a {
 
 .page-header h1 {
   font-family: 'Playfair Display', serif;
-  font-size: 50px;
+  font-size: 38px;
   margin-bottom: 10px;
+  letter-spacing: 0.4px;
 }
 
 .page-header p {
-  font-size: 16px;
+  font-size: 14px;
   opacity: 0.85;
 }
 
@@ -93,12 +111,19 @@ a {
 }
 
 .card h3 {
-  font-size: 18px;
+  font-size: 17px;
   margin-bottom: 8px;
 }
 
-.card p {
+.card,
+.table-wrap,
+.panel,
+.file-row {
   font-size: 14px;
+}
+
+.card p {
+  font-size: 13px;
   opacity: 0.85;
 }
 
@@ -138,9 +163,9 @@ tr:not(:last-child) td {
 
 .hero-content h1 {
   font-family: 'Playfair Display', serif;
-  font-size: 64px;
+  font-size: 52px;
   line-height: 1.15;
-  margin-bottom: 40px;
+  margin-bottom: 34px;
 }
 
 /* HERO ACTIONS */
@@ -221,7 +246,7 @@ tr:not(:last-child) td {
   opacity: 0.85;
 }
 .logo-img {
-  width: 138px;
+  width: 120px;
   max-width: 100%;
   height: auto;
 }
@@ -260,11 +285,11 @@ tr:not(:last-child) td {
 }
 
 .link-card h3 {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .link-card p {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   opacity: 0.9;
   min-height: 42px;
@@ -301,7 +326,7 @@ tr:not(:last-child) td {
 
 .panel h2 {
   margin-bottom: 16px;
-  font-size: 22px;
+  font-size: 18px;
 }
 
 .input-grid {
@@ -439,6 +464,14 @@ select option {
   .file-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .hero-content h1 {
+    font-size: 40px;
+  }
+
+  .page-header h1 {
+    font-size: 30px;
   }
 }
 
